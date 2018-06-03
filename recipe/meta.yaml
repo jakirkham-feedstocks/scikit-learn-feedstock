@@ -8,9 +8,12 @@ package:
 source:
   url: https://github.com/scikit-learn/scikit-learn/archive/{{ version }}.tar.gz
   sha256: 2947f531ad52e81b2436b26608d8198778ac0b4baa7d2925db8b3b3fcb39c8a2
+  patches:
+    # Add optional positivity constraint to dictionary learning
+    - patch_0.19.1_dict_pos_constrt.patch
 
 build:
-  number: 201
+  number: 202
   # We lack openblas on Windows, and therefore can't build numpy there either currently.
   skip: true  # [win]
   features:

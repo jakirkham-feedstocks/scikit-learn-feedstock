@@ -11,6 +11,8 @@ source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
   sha256: b276739a5f863ccacb61999a3067d0895ee291c95502929b2ae56ea1f882e888
   patches:
+    # Patch Cython build issue
+    - PR_10343.patch
     # Add optional positivity constraint to dictionary learning
     - patch_0.19.1_dict_pos_constrt.patch
 

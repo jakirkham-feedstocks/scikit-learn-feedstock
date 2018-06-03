@@ -1,0 +1,22 @@
+From d7ba3322349797e41cf0f2c423b9fdb4973b5c82 Mon Sep 17 00:00:00 2001
+From: Andreas Mueller <andreas.mueller@columbia.edu>
+Date: Tue, 19 Dec 2017 15:26:26 -0500
+Subject: [PATCH] I'm just guessing
+
+---
+ sklearn/metrics/cluster/setup.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git sklearn/metrics/cluster/setup.py sklearn/metrics/cluster/setup.py
+index 910cc829a10f..2707839992b5 100644
+--- sklearn/metrics/cluster/setup.py
++++ sklearn/metrics/cluster/setup.py
+@@ -5,7 +5,7 @@
+ 
+ 
+ def configuration(parent_package="", top_path=None):
+-    config = Configuration("metrics/cluster", parent_package, top_path)
++    config = Configuration("metrics.cluster", parent_package, top_path)
+     libraries = []
+     if os.name == 'posix':
+         libraries.append('m')

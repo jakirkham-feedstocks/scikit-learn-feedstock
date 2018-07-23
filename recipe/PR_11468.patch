@@ -1,0 +1,64 @@
+From 222da38ab2347951beaee92357e42a3ba0a62299 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Tue, 10 Jul 2018 10:00:34 -0400
+Subject: [PATCH 1/2] Use `clip` to make dictionary positive
+
+Instead of finding a mask of negative values and setting them to zero,
+use NumPy's `clip` to replace all values less than zero with zero. These
+have the same effect other than `clip` is a bit faster as it avoids
+creating an intermediate bool array for setting values instead doing
+this in-place.
+---
+ sklearn/decomposition/dict_learning.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index dd0adb0c2a2f..10ab39e34d61 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -383,7 +383,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+         dictionary[:, k] = np.dot(R, code[k, :].T)
+         if positive:
+-            dictionary[:, k][dictionary[:, k] < 0] = 0.0
++            np.clip(dictionary[:, k], 0, None, out=dictionary[:, k])
+         # Scale k'th atom
+         atom_norm_square = np.dot(dictionary[:, k], dictionary[:, k])
+         if atom_norm_square < 1e-20:
+@@ -394,7 +394,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+                 print("Adding new random atom")
+             dictionary[:, k] = random_state.randn(n_features)
+             if positive:
+-                dictionary[:, k][dictionary[:, k] < 0] = 0.0
++                np.clip(dictionary[:, k], 0, None, out=dictionary[:, k])
+             # Setting corresponding coefs to 0
+             code[k, :] = 0.0
+             dictionary[:, k] /= sqrt(np.dot(dictionary[:, k],
+
+From a64c25f80e37c79a7669b4fadfab74914e43edb4 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Tue, 10 Jul 2018 12:45:52 -0400
+Subject: [PATCH 2/2] Use `clip` in `_sparse_encode`'s `threshold` case
+
+Instead of finding a mask of negative values and setting them to zero,
+use NumPy's `clip` to replace all values less than zero with zero. These
+have the same effect other than `clip` is a bit faster as it avoids
+creating an intermediate bool array for setting values instead doing
+this in-place.
+---
+ sklearn/decomposition/dict_learning.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index 10ab39e34d61..ef741c4edacc 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -160,7 +160,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
+         new_code = ((np.sign(cov) *
+                     np.maximum(np.abs(cov) - regularization, 0)).T)
+         if positive:
+-            new_code[new_code < 0] = 0
++            np.clip(new_code, 0, None, out=new_code)
+ 
+     elif algorithm == 'omp':
+         # TODO: Should verbose argument be passed to this?

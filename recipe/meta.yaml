@@ -15,6 +15,8 @@ source:
     - PR_11342.patch
     # Add optional positivity constraint to dictionary learning
     - patch_0.19.1_dict_pos_constrt.patch
+    # Patch for using NumPy clip
+    - PR_11468.patch
 
 build:
   number: 200

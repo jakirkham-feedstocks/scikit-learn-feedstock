@@ -19,6 +19,8 @@ source:
     - PR_11468.patch
     # Patch to drop unneeded typedefs
     - PR_11501.patch
+    # Patch to use GEMM in `_update_dict`
+    - PR_11420.patch
 
 build:
   number: 200

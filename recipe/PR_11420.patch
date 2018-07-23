@@ -1,0 +1,84 @@
+From 1985177227e5608e7ee82520dc0ec7b587910d64 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Tue, 3 Jul 2018 17:18:00 -0400
+Subject: [PATCH 1/3] Get BLAS functions as part of prep
+
+---
+ sklearn/decomposition/dict_learning.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index dd0adb0c2a2f..9cb8e1af5422 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -373,11 +373,12 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+     n_components = len(code)
+     n_features = Y.shape[0]
+     random_state = check_random_state(random_state)
++    # Get BLAS functions
++    ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+     # Residuals, computed 'in-place' for efficiency
+     R = -np.dot(dictionary, code)
+     R += Y
+     R = np.asfortranarray(R)
+-    ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+     for k in range(n_components):
+         # R <- 1.0 * U_k * V_k^T + R
+         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+
+From 78c0570954f981f0cfd065c954d29a5bd715b5e9 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Tue, 3 Jul 2018 18:57:12 -0400
+Subject: [PATCH 2/3] Use BLAS GEMM routine to compute residuals
+
+This fuses the multiplication and addition together into the same
+computation. Also includes the sign change as well. Not to mention that
+SciPy linalg routines return Fortran ordered arrays (even if they were
+C-ordered originally) unlike NumPy's `dot`. So this avoids a copy as
+well.
+---
+ sklearn/decomposition/dict_learning.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index 9cb8e1af5422..90240c4b6b4d 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -374,11 +374,11 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+     n_features = Y.shape[0]
+     random_state = check_random_state(random_state)
+     # Get BLAS functions
++    gemm, = linalg.get_blas_funcs(('gemm',), (dictionary, code, Y))
+     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+-    # Residuals, computed 'in-place' for efficiency
+-    R = -np.dot(dictionary, code)
+-    R += Y
+-    R = np.asfortranarray(R)
++    # Residuals, computed with BLAS for speed and efficiency
++    # R <- -1.0 * U * V^T + 1.0 * Y
++    R = gemm(-1.0, dictionary, code, 1.0, Y)
+     for k in range(n_components):
+         # R <- 1.0 * U_k * V_k^T + R
+         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+
+From 4da1193cdc7aeb1f4652959c8532b5fbfe49072d Mon Sep 17 00:00:00 2001
+From: Alexandre Gramfort <alexandre.gramfort@m4x.org>
+Date: Wed, 18 Jul 2018 10:02:01 +0200
+Subject: [PATCH 3/3] add comment [ci skip]
+
+---
+ sklearn/decomposition/dict_learning.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index 90240c4b6b4d..ed62a94fe31f 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -378,6 +378,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+     # Residuals, computed with BLAS for speed and efficiency
+     # R <- -1.0 * U * V^T + 1.0 * Y
++    # Outputs R as Fortran array for efficiency
+     R = gemm(-1.0, dictionary, code, 1.0, Y)
+     for k in range(n_components):
+         # R <- 1.0 * U_k * V_k^T + R

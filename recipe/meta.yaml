@@ -17,6 +17,8 @@ source:
     - patch_0.19.1_dict_pos_constrt.patch
     # Patch for using NumPy clip
     - PR_11468.patch
+    # Patch to drop unneeded typedefs
+    - PR_11501.patch
 
 build:
   number: 200

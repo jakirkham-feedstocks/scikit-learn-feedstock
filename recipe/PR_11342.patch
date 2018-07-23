@@ -1,0 +1,61 @@
+From bbc7fc23c179349ec0a5915bbd5a8d9c37e4949a Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 21 Jun 2018 14:54:15 -0400
+Subject: [PATCH 1/2] BUG: Ensure dictionary is writable
+
+As the `dictionary` in `dict_learning_online` can be supplied by the
+user and we intend to write to it, ensure that it is writable before
+proceeding. This is needed as `dict_learning_online` will overwrite data
+in `dictionary` as it runs.
+---
+ sklearn/decomposition/dict_learning.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index db95edca0afa..04e3d118b627 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -749,6 +749,8 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
+ 
+     dictionary = check_array(dictionary.T, order='F', dtype=np.float64,
+                              copy=False)
++    dictionary = np.require(dictionary, requirements='W')
++
+     X_train = check_array(X_train, order='C', dtype=np.float64, copy=False)
+ 
+     batches = gen_batches(n_samples, batch_size)
+
+From 0104261937276fe2f0932e6cb0227c29a230db61 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 21 Jun 2018 20:05:20 -0400
+Subject: [PATCH 2/2] TST: Dictionary learning with read-only array
+
+Add a new test based on an existing one with a user provided dictionary
+to ensure that if the array is read-only, `dict_learning_online` will
+turn it into a writable array (copying if needed). Without the fix
+included this test will fail by trying to write to the dictionary, which
+is read-only due to the initialization condition.
+---
+ sklearn/decomposition/tests/test_dict_learning.py | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git sklearn/decomposition/tests/test_dict_learning.py sklearn/decomposition/tests/test_dict_learning.py
+index 0bf62cbc8d77..4f98f528f509 100644
+--- sklearn/decomposition/tests/test_dict_learning.py
++++ sklearn/decomposition/tests/test_dict_learning.py
+@@ -264,6 +264,15 @@ def test_dict_learning_online_initialization():
+     assert_array_equal(dico.components_, V)
+ 
+ 
++def test_dict_learning_online_readonly_initialization():
++    n_components = 12
++    rng = np.random.RandomState(0)
++    V = rng.randn(n_components, n_features)
++    V.setflags(write=False)
++    MiniBatchDictionaryLearning(n_components, n_iter=1, dict_init=V,
++                                random_state=0, shuffle=False).fit(X)
++
++
+ def test_dict_learning_online_partial_fit():
+     n_components = 12
+     rng = np.random.RandomState(0)

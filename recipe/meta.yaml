@@ -11,6 +11,8 @@ source:
   patches:
     # Patch Cython build issue
     - PR_10343.patch
+    # Patch for SciPy change
+    - PR_10723.patch
     # Add optional positivity constraint to dictionary learning
     - patch_0.19.1_dict_pos_constrt.patch
 

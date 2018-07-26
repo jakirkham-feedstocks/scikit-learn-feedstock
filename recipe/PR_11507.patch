@@ -1,0 +1,65 @@
+From 4e7366e8184f8173157a516968c7a82b35921c2d Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 19 Jul 2018 00:08:27 -0400
+Subject: [PATCH] MNT: Use GEMV in enet_coordinate_descent
+
+Make use of the BLAS GEMV operation in `enet_coordinate_descent` instead
+of using DOT in a `for`-loop. They are both semantically equivalent, but
+the former is likely multithreaded in BLAS implementations while here it
+is merely a serial loop.
+---
+ sklearn/linear_model/cd_fast.pyx | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
+index a51d1bdbdbc9..bcae70ce662f 100644
+--- sklearn/linear_model/cd_fast.pyx
++++ sklearn/linear_model/cd_fast.pyx
+@@ -159,14 +159,18 @@ def enet_coordinate_descent(np.ndarray[floating, ndim=1] w,
+     # fused types version of BLAS functions
+     if floating is float:
+         dtype = np.float32
++        gemv = sgemv
+         dot = sdot
+         axpy = saxpy
+         asum = sasum
++        copy = scopy
+     else:
+         dtype = np.float64
++        gemv = dgemv
+         dot = ddot
+         axpy = daxpy
+         asum = dasum
++        copy = dcopy
+ 
+     # get the data information into easy vars
+     cdef unsigned int n_samples = X.shape[0]
+@@ -214,8 +218,11 @@ def enet_coordinate_descent(np.ndarray[floating, ndim=1] w,
+ 
+     with nogil:
+         # R = y - np.dot(X, w)
+-        for i in range(n_samples):
+-            R[i] = y[i] - dot(n_features, &X_data[i], n_samples, w_data, 1)
++        copy(n_samples, y_data, n_tasks, R_data, 1)
++        gemv(CblasColMajor, CblasNoTrans,
++             n_samples, n_features, -1.0, X_data, n_samples,
++             w_data, 1,
++             1.0, R_data, 1)
+ 
+         # tol *= np.dot(y, y)
+         tol *= dot(n_samples, y_data, n_tasks, y_data, n_tasks)
+@@ -269,9 +276,11 @@ def enet_coordinate_descent(np.ndarray[floating, ndim=1] w,
+                 # stopping criterion
+ 
+                 # XtA = np.dot(X.T, R) - beta * w
+-                for i in range(n_features):
+-                    XtA[i] = dot(n_samples, &X_data[i * n_samples],
+-                                 1, R_data, 1) - beta * w[i]
++                copy(n_features, w_data, 1, XtA_data, 1)
++                gemv(CblasColMajor, CblasTrans,
++                     n_samples, n_features, 1.0, X_data, n_samples,
++                     R_data, 1,
++                     -beta, XtA_data, 1)
+ 
+                 if positive:
+                     dual_norm_XtA = max(n_features, XtA_data)

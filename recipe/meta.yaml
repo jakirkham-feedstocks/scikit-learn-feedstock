@@ -22,6 +22,8 @@ source:
     # Patch to use GEMM in `_update_dict`
     - PR_11420.patch
     # Patch to skip another input check
+    - patch_0.19.1_drop_check_arrays_sparse_encode.patch
+    # Patch to skip another input check
     - patch_0.19.2_opt_skip_check_input_preprocess_data.patch
     # Patch to use GEMV in `enet_coordinate_descent`
     - PR_11507.patch

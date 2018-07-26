@@ -1,0 +1,29 @@
+From f0f0a41225bfda32fdd37066e0d9f6013b6f1ea7 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 26 Jul 2018 12:28:33 -0400
+Subject: [PATCH] MNT: Skip array check in dict_learning_online
+
+Already `dict_learning_online` has ensured that `this_X` is a double
+precision, C-ordered array and `dictionary` is a double precision,
+F-ordered array (so `dictionary.T` is C-ordered). The array checks in
+`sparse_encode` only apply to `lasso_cd` where this constraint is met.
+The other checks are merely to validate the input data has reasonable
+values, which again was already checked in `dict_learning_online`. So
+these checks in `sparse_encode` can be bypassed in
+`dict_learning_online`.
+---
+ sklearn/decomposition/dict_learning.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git sklearn/decomposition/dict_learning.py sklearn/decomposition/dict_learning.py
+index 3b8a1916b3c4..0d13674cdc88 100644
+--- sklearn/decomposition/dict_learning.py
++++ sklearn/decomposition/dict_learning.py
+@@ -779,6 +779,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
+ 
+         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
+                                   alpha=alpha, n_jobs=n_jobs,
++                                  check_input=False,
+                                   positive=code_positive).T
+ 
+         # Update the auxiliary variables

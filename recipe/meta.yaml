@@ -11,6 +11,19 @@ source:
   fn: master.zip
   url: https://github.com/scikit-learn/scikit-learn/archive/{{ commit }}.zip
   sha256: 80b4cc38c8f90407b1b0e9599fd8d86d884140cd8b12fddc9251731f06c6334d
+  patches:
+    ####################################################################
+    # Use GEMV in enet_coordinate_descent                              #
+    #                                                                  #
+    # xref: https://github.com/scikit-learn/scikit-learn/pull/11507    #
+    ####################################################################
+    - PR_11507.patch
+    ####################################################################
+    # Some minor performance improvements for enet_coordinate_descent  #
+    #                                                                  #
+    # xref: https://github.com/scikit-learn/scikit-learn/pull/11898    #
+    ####################################################################
+    - PR_11898.patch
 
 build:
   number: 202

@@ -1,0 +1,173 @@
+From a69fd5bf236bc63b41ca0e576631648fe8031832 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 00:25:45 -0400
+Subject: [PATCH 1/6] Use `fmax` when finding the maximum
+
+Instead of adding an `if` to check for values that become the new max,
+simply use `fmax` to get the maximum and update the value. This improves
+readability. It may improve performance as `fmax` can be a single
+assembly instruction. Though most compilers can probably figure this out
+anyways.
+---
+ sklearn/linear_model/cd_fast.pyx | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
+index 9a6c68bd0a62..4794f8f71235 100644
+--- sklearn/linear_model/cd_fast.pyx
++++ sklearn/linear_model/cd_fast.pyx
+@@ -244,11 +244,9 @@ def enet_coordinate_descent(floating[::1] w,
+ 
+                 # update the maximum absolute coefficient update
+                 d_w_ii = fabs(w[ii] - w_ii)
+-                if d_w_ii > d_w_max:
+-                    d_w_max = d_w_ii
++                d_w_max = fmax(d_w_max, d_w_ii)
+ 
+-                if fabs(w[ii]) > w_max:
+-                    w_max = fabs(w[ii])
++                w_max = fmax(w_max, fabs(w[ii]))
+ 
+             if (w_max == 0.0 or
+                 d_w_max / w_max < d_w_tol or
+
+From baa7862f124bce39060d4a80be64953746ae72e7 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 00:25:47 -0400
+Subject: [PATCH 2/6] Shortcut w[ii] computation that will be 0
+
+While its true that having `tmp` less than 0, will result in `w[ii]`
+being `0`, this is also true if `tmp` is less than `alpha`. So change
+the check to look for `tmp` less than or equal to `alpha`.
+---
+ sklearn/linear_model/cd_fast.pyx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
+index 4794f8f71235..0f1111d69bff 100644
+--- sklearn/linear_model/cd_fast.pyx
++++ sklearn/linear_model/cd_fast.pyx
+@@ -232,7 +232,7 @@ def enet_coordinate_descent(floating[::1] w,
+                 # tmp = (X[:,ii]*R).sum()
+                 tmp = dot(n_samples, &X[0, ii], 1, &R[0], 1)
+ 
+-                if positive and tmp < 0:
++                if positive and tmp <= alpha:
+                     w[ii] = 0.0
+                 else:
+                     w[ii] = (fsign(tmp) * fmax(fabs(tmp) - alpha, 0)
+
+From d28977291197902c7cc461206e0d725c7ae3b748 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 00:58:29 -0400
+Subject: [PATCH 3/6] Break up positivity check when determining `w[ii]`
+
+If `tmp` is positive semidefinite and less than `alpha`, it will effectively set
+`w[ii]` to `0` through computation regardless of whether positivity is
+enforced or not. Hence we check for this case alone.
+
+If positivity is enforced, then `w[ii]` is set to `0` if `tmp` is
+negative as well. So the first check is sufficient.
+
+If positivity is not enforced, then `tmp` could be larger in magnitude
+than `alpha`, which would be enough to make `w[ii]` not `0`. Hence we
+need to check for this case as well.
+
+In other words, if `tmp` is bounded by `-alpha` and `alpha`, `w[ii]`
+will be `0` (regardless of whether positivity is enforced). If
+positivity is enforced, we have the additional constraint that `tmp`
+cannot be less than `0`, which means `tmp` must only be greater than
+`alpha`.
+---
+ sklearn/linear_model/cd_fast.pyx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
+index 0f1111d69bff..b437fa4e79b8 100644
+--- sklearn/linear_model/cd_fast.pyx
++++ sklearn/linear_model/cd_fast.pyx
+@@ -232,7 +232,7 @@ def enet_coordinate_descent(floating[::1] w,
+                 # tmp = (X[:,ii]*R).sum()
+                 tmp = dot(n_samples, &X[0, ii], 1, &R[0], 1)
+ 
+-                if positive and tmp <= alpha:
++                if (positive or -alpha <= tmp) and (tmp <= alpha):
+                     w[ii] = 0.0
+                 else:
+                     w[ii] = (fsign(tmp) * fmax(fabs(tmp) - alpha, 0)
+
+From ae0055566b9214a2eb835c393dfb90a828e65a20 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 00:58:31 -0400
+Subject: [PATCH 4/6] Merge `axpy` computation with `w[ii]` computation
+
+As the first case of this `if` sets `w[ii]` to `0`, we already know it
+doesn't apply to the `axpy` call, so we can merge this into the `else`
+easily. Further if the first condition doesn't apply, we know `w[ii]` is
+nonzero. So there is no need to check for it again within the `else`.
+Hence we can cleanly merge the `axpy` into the previous `else` dropping
+the additional check.
+---
+ sklearn/linear_model/cd_fast.pyx | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
+index b437fa4e79b8..0a4e9f32395c 100644
+--- sklearn/linear_model/cd_fast.pyx
++++ sklearn/linear_model/cd_fast.pyx
+@@ -238,7 +238,6 @@ def enet_coordinate_descent(floating[::1] w,
+                     w[ii] = (fsign(tmp) * fmax(fabs(tmp) - alpha, 0)
+                              / (norm_cols_X[ii] + beta))
+ 
+-                if w[ii] != 0.0:
+                     # R -=  w[ii] * X[:,ii] # Update residual
+                     axpy(n_samples, -w[ii], &X[0, ii], 1, &R[0], 1)
+ 
+
+From d7a03eba3fe20e89278abeb72c90b5fda302f654 Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 01:25:23 -0400
+Subject: [PATCH 5/6] DOC: Drop `-` from `0`
+
+---
+ doc/tutorial/statistical_inference/supervised_learning.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git doc/tutorial/statistical_inference/supervised_learning.rst doc/tutorial/statistical_inference/supervised_learning.rst
+index e60751b7f688..6fc93a321823 100644
+--- doc/tutorial/statistical_inference/supervised_learning.rst
++++ doc/tutorial/statistical_inference/supervised_learning.rst
+@@ -337,7 +337,7 @@ application of Occam's razor: *prefer simpler models*.
+        max_iter=1000, normalize=False, positive=False, precompute=False,
+        random_state=None, selection='cyclic', tol=0.0001, warm_start=False)
+     >>> print(regr.coef_)  # doctest: +NORMALIZE_WHITESPACE
+-    [   0.         -212.43764548  517.19478111  313.77959962 -160.8303982    -0.
++    [   0.         -212.43764548  517.19478111  313.77959962 -160.8303982     0.
+      -187.19554705   69.38229038  508.66011217   71.84239008]
+ 
+ .. topic:: **Different algorithms for the same problem**
+
+From 22684675769bdac7dd83c4a9c8f1747ed5b3ed7c Mon Sep 17 00:00:00 2001
+From: John Kirkham <kirkhamj@janelia.hhmi.org>
+Date: Thu, 23 Aug 2018 01:26:25 -0400
+Subject: [PATCH 6/6] DOC: Wrap result line to match expected result
+
+---
+ doc/tutorial/statistical_inference/supervised_learning.rst | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git doc/tutorial/statistical_inference/supervised_learning.rst doc/tutorial/statistical_inference/supervised_learning.rst
+index 6fc93a321823..231a3ca364cb 100644
+--- doc/tutorial/statistical_inference/supervised_learning.rst
++++ doc/tutorial/statistical_inference/supervised_learning.rst
+@@ -337,8 +337,8 @@ application of Occam's razor: *prefer simpler models*.
+        max_iter=1000, normalize=False, positive=False, precompute=False,
+        random_state=None, selection='cyclic', tol=0.0001, warm_start=False)
+     >>> print(regr.coef_)  # doctest: +NORMALIZE_WHITESPACE
+-    [   0.         -212.43764548  517.19478111  313.77959962 -160.8303982     0.
+-     -187.19554705   69.38229038  508.66011217   71.84239008]
++    [   0.         -212.43764548  517.19478111  313.77959962 -160.8303982
++        0.         -187.19554705   69.38229038  508.66011217   71.84239008]
+ 
+ .. topic:: **Different algorithms for the same problem**
+ 

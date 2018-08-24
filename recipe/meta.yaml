@@ -1,6 +1,7 @@
 {% set version = "0.20.dev" %}
 {% set name = "scikit-learn" %}
 {% set variant = "openblas" %}
+{% set commit = "2fe58e517c7813539d3e3fc283b595a9a712c891" %}
 
 package:
   name: {{ name }}
@@ -8,8 +9,8 @@ package:
 
 source:
   fn: master.zip
-  url: https://github.com/scikit-learn/scikit-learn/archive/master.zip
-  sha256: d31c1654ccbb71dc8d86531aa1a5db85f2c486601738edcb3174ab2285abf655
+  url: https://github.com/scikit-learn/scikit-learn/archive/{{ commit }}.zip
+  sha256: 80b4cc38c8f90407b1b0e9599fd8d86d884140cd8b12fddc9251731f06c6334d
 
 build:
   number: 202

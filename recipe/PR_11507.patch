@@ -1,61 +1,7 @@
-From 3a90bb2d2de396b36fbd158e9c27f169e12e8b6b Mon Sep 17 00:00:00 2001
+From 36ce219a2d92b165773b7511315913c58a324045 Mon Sep 17 00:00:00 2001
 From: John Kirkham <kirkhamj@janelia.hhmi.org>
-Date: Wed, 22 Aug 2018 21:08:24 -0400
-Subject: [PATCH 1/2] MNT: Use GEMVN in enet_coordinate_descent
-
-Make use of the BLAS GEMV operation for non-transposed arrays in
-`enet_coordinate_descent` instead of using DOT in a `for`-loop. They are
-both semantically equivalent, but the former is likely multithreaded in
-BLAS implementations while here it is merely a serial loop. We avoid
-GEMV for transposed arrays as the reference BLAS included has a bug for
-this type of operation. When we either fix the reference BLAS or drop
-it, we can use GEMV for transposed arrays as well.
----
- sklearn/linear_model/cd_fast.pyx | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
-
-diff --git sklearn/linear_model/cd_fast.pyx sklearn/linear_model/cd_fast.pyx
-index 9a6c68bd0a62..cd044824b4b7 100644
---- sklearn/linear_model/cd_fast.pyx
-+++ sklearn/linear_model/cd_fast.pyx
-@@ -159,14 +159,18 @@ def enet_coordinate_descent(floating[::1] w,
-     # fused types version of BLAS functions
-     if floating is float:
-         dtype = np.float32
-+        gemv = sgemv
-         dot = sdot
-         axpy = saxpy
-         asum = sasum
-+        copy = scopy
-     else:
-         dtype = np.float64
-+        gemv = dgemv
-         dot = ddot
-         axpy = daxpy
-         asum = dasum
-+        copy = dcopy
- 
-     # get the data information into easy vars
-     cdef unsigned int n_samples = X.shape[0]
-@@ -205,8 +209,11 @@ def enet_coordinate_descent(floating[::1] w,
- 
-     with nogil:
-         # R = y - np.dot(X, w)
--        for i in range(n_samples):
--            R[i] = y[i] - dot(n_features, &X[i, 0], n_samples, &w[0], 1)
-+        copy(n_samples, &y[0], 1, &R[0], 1)
-+        gemv(CblasColMajor, CblasNoTrans,
-+             n_samples, n_features, -1.0, &X[0, 0], n_samples,
-+             &w[0], 1,
-+             1.0, &R[0], 1)
- 
-         # tol *= np.dot(y, y)
-         tol *= dot(n_samples, &y[0], 1, &y[0], 1)
-
-From 3f52fd7a71ba36a6c84748bdfd178e8fdfc7e601 Mon Sep 17 00:00:00 2001
-From: John Kirkham <kirkhamj@janelia.hhmi.org>
-Date: Wed, 22 Aug 2018 21:44:05 -0400
-Subject: [PATCH 2/2] MNT: Use GEMV in enet_coordinate_descent
+Date: Mon, 27 Aug 2018 09:31:27 -0400
+Subject: [PATCH] MNT: Use GEMV in enet_coordinate_descent
 
 Make use of the BLAS GEMV operation in `enet_coordinate_descent` instead
 of using DOT in a `for`-loop. Go ahead and use GEMV with both

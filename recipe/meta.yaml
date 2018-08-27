@@ -1,7 +1,7 @@
 {% set version = "0.20.dev" %}
 {% set name = "scikit-learn" %}
 {% set variant = "openblas" %}
-{% set commit = "2fe58e517c7813539d3e3fc283b595a9a712c891" %}
+{% set commit = "8d7ce8e7b3a2e8bb7aa7ba1b6930c8321de9a183" %}
 
 package:
   name: {{ name }}
@@ -10,7 +10,7 @@ package:
 source:
   fn: master.zip
   url: https://github.com/scikit-learn/scikit-learn/archive/{{ commit }}.zip
-  sha256: 80b4cc38c8f90407b1b0e9599fd8d86d884140cd8b12fddc9251731f06c6334d
+  sha256: 6f2dd73f1f9cfc3784f2e79a184f72a34bc5716ca4a059bbc3058970c3f862d3
   patches:
     ####################################################################
     # Use GEMV in enet_coordinate_descent                              #

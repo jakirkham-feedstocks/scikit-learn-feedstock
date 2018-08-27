@@ -8,7 +8,6 @@ package:
   version: {{ version }}
 
 source:
-  fn: master.zip
   url: https://github.com/scikit-learn/scikit-learn/archive/{{ commit }}.zip
   sha256: 6f2dd73f1f9cfc3784f2e79a184f72a34bc5716ca4a059bbc3058970c3f862d3
   patches:

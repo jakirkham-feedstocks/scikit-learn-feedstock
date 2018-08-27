@@ -19,6 +19,12 @@ source:
     ####################################################################
     - PR_11507.patch
     ####################################################################
+    # Cythonize _update_dict                                           #
+    #                                                                  #
+    # xref: https://github.com/scikit-learn/scikit-learn/pull/11874    #
+    ####################################################################
+    - PR_11874.patch
+    ####################################################################
     # Some minor performance improvements for enet_coordinate_descent  #
     #                                                                  #
     # xref: https://github.com/scikit-learn/scikit-learn/pull/11898    #
